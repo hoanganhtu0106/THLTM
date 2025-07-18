@@ -1,0 +1,59 @@
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.util.*;
+
+public class UDPClient {
+    public static void main(String[] args) throws Exception {
+        DatagramSocket socket = new DatagramSocket();
+        InetAddress serverAddress = InetAddress.getByName("203.162.10.109");
+        int serverPort = 807;
+
+        // a. Gửi thông điệp theo định dạng yêu cầu
+        String studentCode = "B21DCCN744";
+        String qCode = "ylrhZ6UM";
+        String msg = ";" + studentCode + ";" + qCode;
+        byte[] outData = msg.getBytes();
+        DatagramPacket outPacket = new DatagramPacket(outData, outData.length, serverAddress, serverPort);
+        socket.send(outPacket);
+
+        // b. Nhận thông điệp phản hồi từ server
+        byte[] inData = new byte[1024];
+        DatagramPacket inPacket = new DatagramPacket(inData, inData.length);
+        socket.receive(inPacket);
+        String res = new String(inPacket.getData(), 0, inPacket.getLength());
+
+        // Phân tích chuỗi phản hồi
+        String[] parts = res.split(";");
+        String requestId = parts[0];
+        int n = Integer.parseInt(parts[1]);
+        int k = Integer.parseInt(parts[2]);
+        String[] nums = parts[3].split(",");
+        int[] arr = new int[n];
+        for (int i = 0; i < n; i++) arr[i] = Integer.parseInt(nums[i]);
+
+        // c. Tính max trong mỗi cửa sổ trượt
+        List<Integer> result = new ArrayList<>();
+        Deque<Integer> dq = new ArrayDeque<>();
+        for (int i = 0; i < n; i++) {
+            while (!dq.isEmpty() && dq.peek() <= i - k) dq.poll();
+            while (!dq.isEmpty() && arr[dq.peekLast()] < arr[i]) dq.pollLast();
+            dq.offer(i);
+            if (i >= k - 1) result.add(arr[dq.peek()]);
+        }
+
+        // Ghép kết quả và gửi lại
+        StringBuilder sb = new StringBuilder();
+        sb.append(requestId).append(";");
+        for (int i = 0; i < result.size(); i++) {
+            sb.append(result.get(i));
+            if (i != result.size() - 1) sb.append(",");
+        }
+        byte[] sendBack = sb.toString().getBytes();
+        DatagramPacket replyPacket = new DatagramPacket(sendBack, sendBack.length, serverAddress, serverPort);
+        socket.send(replyPacket);
+
+        // d. Đóng socket
+        socket.close();
+    }
+}
